@@ -29,7 +29,7 @@ echo "==> 2. System update..."
 apt-get update -y
 apt-get dist-upgrade -y
 
-echo "==> 3. Installing dependencies & media codecs..."
+echo "==> 3. Installing dependencies, utilities & media codecs..."
 apt-get install -y \
     curl \
     wget \
@@ -43,7 +43,11 @@ apt-get install -y \
     accountsservice \
     cups \
     simple-scan \
-    ffmpeg
+    ffmpeg \
+    gnome-calculator \
+    gnome-text-editor \
+    yelp \
+    gnome-software
 
 echo "==> 4. Configuring automatic updates..."
 cat <<'EOF' > /etc/apt/apt.conf.d/20auto-upgrades
@@ -72,6 +76,8 @@ echo "==> 6. Setting default wallpaper and profile picture..."
 if [[ -f "${WALLPAPER_SRC}" ]]; then
     cp "${WALLPAPER_SRC}" "${WALLPAPER_DEST}"
     chmod 644 "${WALLPAPER_DEST}"
+else
+    echo "Warning: ${WALLPAPER_SRC} missing!" >&2
 fi
 
 if [[ -f "${AVATAR_SRC}" ]]; then
@@ -86,7 +92,7 @@ SystemAccount=false
 EOF
 fi
 
-echo "==> 7. Configuring GNOME dconf defaults..."
+echo "==> 7. Configuring GNOME dconf defaults & Dock favorites..."
 mkdir -p /etc/dconf/profile
 cat <<'EOF' > /etc/dconf/profile/user
 user-db:user
@@ -102,7 +108,7 @@ picture-options='zoom'
 
 [org/gnome/shell]
 enabled-extensions=['dash-to-dock@micxgx.gmail.com']
-favorite-apps=['firefox-esr.desktop', 'org.onlyoffice.desktop-editors.desktop', 'org.gnome.Nautilus.desktop']
+favorite-apps=['firefox-esr.desktop', 'org.gnome.Nautilus.desktop', 'org.onlyoffice.desktopeditors.desktop', 'org.gnome.Calculator.desktop', 'org.gnome.TextEditor.desktop', 'org.gnome.Software.desktop', 'yelp.desktop']
 
 [org/gnome/shell/extensions/dash-to-dock]
 dock-fixed=false
@@ -113,9 +119,10 @@ EOF
 
 dconf update
 
-echo "==> 8. Setting up Firefox policy and autostart..."
-mkdir -p /etc/firefox-esr/policies
-cat <<'EOF' > /etc/firefox-esr/policies/policies.json
+echo "==> 8. Setting up Firefox home page & autostart..."
+# Global Firefox policy configuration to ensure the start page works correctly
+mkdir -p /usr/share/firefox-esr/distribution/policies
+cat <<'EOF' > /usr/share/firefox-esr/distribution/policies/policies.json
 {
   "policies": {
     "Homepage": {
@@ -126,6 +133,15 @@ cat <<'EOF' > /etc/firefox-esr/policies/policies.json
   }
 }
 EOF
+
+# Additional dconf setting to force the Firefox home page behavior
+cat <<EOF >> /etc/dconf/db/local.d/00-croix-rouge
+
+[org/gnome/shell/launchers/firefox]
+home-page='https://connect.croix-rouge.fr'
+EOF
+
+dconf update
 
 BENEVOLE_HOME=$(eval echo "~${BENEVOLE_USER}")
 AUTOSTART_DIR="${BENEVOLE_HOME}/.config/autostart"
@@ -143,6 +159,8 @@ chown -R "${BENEVOLE_USER}:${BENEVOLE_USER}" "${BENEVOLE_HOME}/.config"
 
 echo "==> 9. Setting up Flathub & ONLYOffice..."
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak install -y flathub org.onlyoffice.desktop-editors
+# Force appstream update to prevent "Nothing matches" errors
+flatpak update --appstream -y
+flatpak install -y flathub org.onlyoffice.desktopeditors
 
 echo "==> Setup completed successfully!"
